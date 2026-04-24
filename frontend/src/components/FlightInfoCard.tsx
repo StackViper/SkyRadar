@@ -1,104 +1,148 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Flight } from '../types/flight.types';
-import { theme } from '../theme';
-import { formatAltitude, formatSpeed } from '../utils/format';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { Flight } from '../types/flight';
+import { msToKmh, getFlightStatus } from '../utils/helpers';
+import { Plane, TrendingUp, TrendingDown, Minus, Navigation } from 'lucide-react-native';
 
-interface Props {
+interface FlightInfoCardProps {
   flight: Flight;
 }
 
-export const FlightInfoCard: React.FC<Props> = ({ flight }) => {
-  const getTrendColor = () => {
-    switch (flight.trend) {
-      case 'CLIMBING': return theme.colors.success;
-      case 'DESCENDING': return theme.colors.error;
-      default: return theme.colors.textSecondary;
-    }
+const { width } = Dimensions.get('window');
+
+const FlightInfoCard = ({ flight }: FlightInfoCardProps) => {
+  const status = getFlightStatus(flight.vertical_rate);
+
+  const getStatusIcon = () => {
+    if (status === 'Climbing') return <TrendingUp size={16} color="#4ADE80" />;
+    if (status === 'Descending') return <TrendingDown size={16} color="#F87171" />;
+    return <Minus size={16} color="#94A3B8" />;
   };
 
-  const trendIcon = flight.trend === 'CLIMBING' ? '▲' : flight.trend === 'DESCENDING' ? '▼' : '▬';
-
   return (
-    <View style={styles.card}>
+    <BlurView intensity={90} tint="dark" style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.callsign}>{flight.callsign || 'Unknown'}</Text>
-        <View style={styles.trendContainer}>
-          <Text style={[styles.trendIcon, { color: getTrendColor() }]}>{trendIcon}</Text>
-          <Text style={styles.trendText}>{flight.trend}</Text>
+        <View>
+          <Text style={styles.callsign}>{flight.callsign || 'N/A'}</Text>
+          <Text style={styles.icao}>ICAO: {flight.icao24}</Text>
+        </View>
+        <Plane size={24} color="#3B82F6" />
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.grid}>
+        <View style={styles.item}>
+          <Text style={styles.label}>Altitude</Text>
+          <Text style={styles.value}>{Math.round(flight.altitude)} m</Text>
+        </View>
+        <View style={styles.item}>
+          <Text style={styles.label}>Speed</Text>
+          <Text style={styles.value}>{msToKmh(flight.velocity)} km/h</Text>
+          <Text style={styles.subValue}>({flight.velocity} m/s)</Text>
         </View>
       </View>
 
-      <View style={styles.stats}>
-        <View style={styles.statColumn}>
-          <Text style={styles.statLabel}>Altitude</Text>
-          <Text style={styles.statValue}>{formatAltitude(flight.altitude)}</Text>
+      <View style={styles.footer}>
+        <View style={styles.statusBadge}>
+          {getStatusIcon()}
+          <Text style={styles.statusText}>{status}</Text>
         </View>
-        <View style={styles.statColumn}>
-          <Text style={styles.statLabel}>Speed</Text>
-          <Text style={styles.statValue}>{formatSpeed(flight.speed)}</Text>
-        </View>
-        <View style={styles.statColumn}>
-          <Text style={styles.statLabel}>V.Rate</Text>
-          <Text style={styles.statValue}>{flight.verticalRate.toFixed(1)}</Text>
+        <View style={styles.headingBox}>
+           <Navigation size={14} color="#94A3B8" style={{ transform: [{ rotate: `${flight.heading || 0}deg` }] }} />
+           <Text style={styles.headingText}>{flight.heading || 0}°</Text>
         </View>
       </View>
-    </View>
+    </BlurView>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.m,
-    padding: theme.spacing.m,
-    marginBottom: theme.spacing.m,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
+  container: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    padding: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.m,
+    marginBottom: 15,
   },
   callsign: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#F8FAFC',
   },
-  trendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  trendIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  trendText: {
-    color: theme.colors.textSecondary,
+  icao: {
     fontSize: 12,
-    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 2,
   },
-  stats: {
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 15,
+  },
+  grid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 15,
   },
-  statColumn: {
-    alignItems: 'flex-start',
+  item: {
+    flex: 1,
   },
-  statLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
+  label: {
+    fontSize: 12,
+    color: '#94A3B8',
     textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: 4,
   },
-  statValue: {
-    color: theme.colors.text,
-    fontSize: 14,
+  value: {
+    fontSize: 18,
     fontWeight: '600',
+    color: '#F1F5F9',
   },
+  subValue: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E2E8F0',
+  },
+  headingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headingText: {
+    fontSize: 12,
+    color: '#94A3B8',
+  }
 });
+
+export default FlightInfoCard;
