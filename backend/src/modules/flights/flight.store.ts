@@ -4,7 +4,7 @@ class FlightStore {
   private static instance: FlightStore;
   private flights: FlightData[] = [];
   private lastUpdatedAt: Date | null = null;
-  private staleDataThresholdMs = 30000;
+  private staleDataThresholdMs = 300000; // 5 minutes — keep cached data valid during rate-limit backoff
 
   private constructor() {}
 

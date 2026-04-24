@@ -21,6 +21,7 @@ export interface FlightData {
   longitude: number;
   altitude: number;
   speed: number;
+  heading: number;        // true_track from index[10] — bearing in degrees (0° = North)
   verticalRate: number;
   trend: 'CLIMBING' | 'DESCENDING' | 'LEVEL';
 }

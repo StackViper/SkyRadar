@@ -2,6 +2,9 @@ import { FlightData, OpenSkyResponse } from './flight.types';
 import { logger } from '../../config/logger';
 
 export class FlightProcessor {
+  // Track the same 2 flights consistently for smooth marker updates
+  private trackedIcao24s: string[] = [];
+
   /**
    * Filters raw OpenSky states based on business rules:
    * - on_ground = false
@@ -29,14 +32,46 @@ export class FlightProcessor {
   }
 
   /**
-   * Randomly selects n flights from the pool.
+   * Dynamically selects 2 flights. Tries to keep tracking the same flights
+   * across polls for smooth UI updates. If a tracked flight is no longer
+   * available (landed, out of range), a new one is picked from the pool.
    */
   public selectDynamicFlights(states: any[][], count: number = 2): any[][] {
-    if (states.length <= count) return states;
+    if (states.length <= count) {
+      // Update tracked IDs to whatever is available
+      this.trackedIcao24s = states.map(s => s[0]);
+      return states;
+    }
+
+    // Try to find previously tracked flights in the new data
+    const stillActive: any[][] = [];
+    const remaining: any[][] = [];
+
+    for (const state of states) {
+      if (this.trackedIcao24s.includes(state[0])) {
+        stillActive.push(state);
+      } else {
+        remaining.push(state);
+      }
+    }
+
+    // Fill with tracked flights first, then pick new ones to fill gaps
+    const result: any[][] = stillActive.slice(0, count);
     
-    // Shuffle and pick
-    const shuffled = [...states].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+    if (result.length < count) {
+      // Shuffle remaining and fill the gap
+      const shuffled = [...remaining].sort(() => 0.5 - Math.random());
+      const needed = count - result.length;
+      result.push(...shuffled.slice(0, needed));
+      
+      if (needed > 0) {
+        logger.info(`Replaced ${needed} tracked flight(s) with new ones from pool of ${remaining.length}`);
+      }
+    }
+
+    // Update tracked IDs
+    this.trackedIcao24s = result.map(s => s[0]);
+    return result;
   }
 
   /**
@@ -57,6 +92,7 @@ export class FlightProcessor {
         latitude: state[6] as number,
         altitude: state[7] as number,
         speed: state[9] as number,
+        heading: (state[10] as number) || 0,  // true_track — bearing in degrees
         verticalRate,
         trend,
       };
@@ -74,6 +110,9 @@ export class FlightProcessor {
 
     const { states } = data;
     const validFlights = this.filterValidFlights(states);
+    
+    logger.debug(`Filtered ${validFlights.length} valid airborne flights from ${states.length} total`);
+    
     const selectedFlights = this.selectDynamicFlights(validFlights, 2);
     return this.normalizeFlights(selectedFlights);
   }
